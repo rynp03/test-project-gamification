@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,6 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
-  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -43,17 +42,17 @@ import {
   chooseRewardEventDraft,
   chooseRewardWithDraft,
   commitRewardEventDraft,
+  commitOnboardedRewardEvent,
   commitRewardWithDraft,
-  openCommissionRewardFlow,
-  openCommissionTierStepForEdit,
   saveCommissionTierStep,
   selectBonusAmount,
   selectCommissionTierDraftId,
-  selectCommissionTierId,
   selectCommissionTierStepActive,
   selectDialogOpen,
   selectDraftBonusAmount,
   selectDraftEvent,
+  selectDraftPostsCount,
+  selectDraftPostsDuration,
   selectDraftRewardWith,
   selectDraftSales,
   selectEndDate,
@@ -63,11 +62,15 @@ import {
   selectRewardEvent,
   selectRewardWith,
   selectRewardWithFooterVisible,
+  selectPostsDuration,
+  selectPostsTimesCount,
   selectRewardWithPopoverOpen,
   selectSalesThreshold,
   setCommissionTierDraftId,
   setDialogOpen,
   setDraftBonusAmount,
+  setDraftPostsCount,
+  setDraftPostsDuration,
   setDraftSales,
   setEndDate,
   setEventPopoverOpen,
@@ -88,6 +91,18 @@ function tierLabelById(id) {
   return COMMISSION_TIERS.find((t) => t.id === id)?.label ?? "";
 }
 
+const POSTS_DURATIONS = [
+  { id: "14d", label: "14 days" },
+  { id: "1mo", label: "1 month" },
+  { id: "2mo", label: "2 months" },
+  { id: "3mo", label: "3 months" },
+  { id: "1y", label: "1 year" },
+];
+
+function postsDurationLabel(id) {
+  return POSTS_DURATIONS.find((d) => d.id === id)?.label ?? "";
+}
+
 const saveHintTooltipClassName =
   "z-110 max-w-[280px] rounded-[10px] border-none bg-[#2d2d2d] px-4 py-2.5 text-[0.75rem] font-light leading-snug text-white shadow-xl";
 
@@ -103,9 +118,15 @@ const GamificationPage = () => {
   const draftBonusAmount = useSelector(selectDraftBonusAmount);
   const rewardWithFooterVisible = useSelector(selectRewardWithFooterVisible);
   const commissionTierStepActive = useSelector(selectCommissionTierStepActive);
-  const commissionTierId = useSelector(selectCommissionTierId);
   const commissionTierDraftId = useSelector(selectCommissionTierDraftId);
+  const postsTimesCount = useSelector(selectPostsTimesCount);
+  const postsDuration = useSelector(selectPostsDuration);
+  const draftPostsCount = useSelector(selectDraftPostsCount);
+  const draftPostsDuration = useSelector(selectDraftPostsDuration);
   const [tierPickerOpen, setTierPickerOpen] = useState(false);
+  const [postsDurationOpen, setPostsDurationOpen] = useState(false);
+  const [endDatePopoverOpen, setEndDatePopoverOpen] = useState(false);
+  const [rewardCreatedToast, setRewardCreatedToast] = useState(false);
   const isTimeBound = useSelector(selectIsTimeBound);
   const endDate = useSelector(selectEndDate);
   const eventPopoverOpen = useSelector(selectEventPopoverOpen);
@@ -115,6 +136,25 @@ const GamificationPage = () => {
     selectEventPopoverFooterVisible
   );
 
+  useEffect(() => {
+    if (draftEvent !== "posts") {
+      setPostsDurationOpen(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setPostsDurationOpen(true));
+    return () => cancelAnimationFrame(id);
+  }, [draftEvent]);
+
+  useEffect(() => {
+    if (!rewardCreatedToast) return;
+    const t = window.setTimeout(() => setRewardCreatedToast(false), 3500);
+    return () => window.clearTimeout(t);
+  }, [rewardCreatedToast]);
+
+  useEffect(() => {
+    if (!isTimeBound) setEndDatePopoverOpen(false);
+  }, [isTimeBound]);
+
   const date = endDate
     ? parse(endDate, "yyyy-MM-dd", new Date())
     : undefined;
@@ -123,10 +163,14 @@ const GamificationPage = () => {
     draftSales.trim().length > 0 &&
     !Number.isNaN(Number(draftSales.replace(/,/g, "")));
 
+  const postsCountValid =
+    draftPostsCount.trim().length > 0 &&
+    !Number.isNaN(Number(draftPostsCount.replace(/,/g, "")));
+  const postsFormValid = postsCountValid && !!draftPostsDuration;
+
   const canSaveRewardEvent =
-    draftEvent === "posts" ||
-    draftEvent === "onboarded" ||
-    (draftEvent === "sales" && salesAmountValid);
+    (draftEvent === "sales" && salesAmountValid) ||
+    (draftEvent === "posts" && postsFormValid);
 
   const commitRewardEvent = () => {
     if (!canSaveRewardEvent) return;
@@ -155,20 +199,17 @@ const GamificationPage = () => {
 
   const rewardEventComplete =
     !!rewardEvent &&
-    (rewardEvent !== "sales" ||
-      (salesThreshold && salesThreshold.trim().length > 0));
+    (rewardEvent === "onboarded" ||
+      (rewardEvent === "sales" &&
+        !!(salesThreshold && salesThreshold.trim().length > 0)) ||
+      (rewardEvent === "posts" &&
+        !!(postsTimesCount && postsTimesCount.trim().length > 0) &&
+        !!postsDuration));
 
   const rewardWithComplete =
-    !!rewardWith &&
-    (rewardWith === "bonus"
-      ? !!(bonusAmount && bonusAmount.trim().length > 0)
-      : rewardWith === "commission"
-        ? !!(commissionTierId && commissionTierId.length > 0)
-        : false);
+    rewardWith === "bonus" &&
+    !!(bonusAmount && bonusAmount.trim().length > 0);
 
-  const commissionTierDisplayLabel = commissionTierId
-    ? tierLabelById(commissionTierId)
-    : "";
   // Updated grid pattern to better match the screenshot
   // 0: white, 1: #fef1fe (bg-gamification-grid-1), 2: #fefbfe (bg-gamification-grid-2)
   const gridPattern = [
@@ -268,9 +309,9 @@ const GamificationPage = () => {
                     </DialogHeader>
                     <div className="space-y-4">
                       <div className="space-y-1.5">
-                        <Label className="inline-flex items-center text-[0.85rem] font-normal text-gray-600">
+                        <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
                           Upgrade to
-                          <sup className="ml-0.5 text-[0.7rem] leading-none text-red-500">
+                          <sup className="ml-px translate-y-[-0.08em] text-[0.6em] font-normal leading-none text-red-500">
                             *
                           </sup>
                         </Label>
@@ -367,8 +408,11 @@ const GamificationPage = () => {
                     <div className="space-y-4">
                   {/* Reward Event */}
                   <div className="space-y-1.5">
-                    <Label className="text-[0.85rem] font-normal text-gray-600 inline-flex items-center">
-                      Reward event<sup className="text-red-500 ml-0.5 text-[0.7rem] leading-none">*</sup>
+                    <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
+                      Reward event
+                      <sup className="ml-px translate-y-[-0.08em] text-[0.6em] font-normal leading-none text-red-500">
+                        *
+                      </sup>
                     </Label>
                     <Popover
                       open={eventPopoverOpen}
@@ -389,7 +433,9 @@ const GamificationPage = () => {
                             {rewardEvent === "sales" &&
                               `Cross $${salesThreshold || "X"} in sales`}
                             {rewardEvent === "posts" &&
-                              "Posts X times every Y period"}
+                              (postsTimesCount && postsDuration
+                                ? `Posts ${postsTimesCount} times every ${postsDurationLabel(postsDuration)}`
+                                : "Posts X times every Y period")}
                             {rewardEvent === "onboarded" && "Is Onboarded"}
                           </span>
                           {eventPopoverOpen ? (
@@ -412,7 +458,7 @@ const GamificationPage = () => {
                               dispatch(chooseRewardEventDraft("sales"))
                             }
                             className={cn(
-                              "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-light transition-colors rounded-t-[10px]",
+                              "flex h-10 w-full items-center justify-between gap-2 px-3 text-left text-sm font-light transition-colors rounded-t-[10px]",
                               draftEvent === "sales"
                                 ? "bg-[#fce8fc] text-sidebar-custom-active"
                                 : "text-gray-900 hover:bg-gray-50"
@@ -467,7 +513,7 @@ const GamificationPage = () => {
                               dispatch(chooseRewardEventDraft("posts"))
                             }
                             className={cn(
-                              "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-light transition-colors",
+                              "flex h-10 w-full items-center justify-between gap-2 px-3 text-left text-sm font-light transition-colors",
                               draftEvent === "posts"
                                 ? "bg-[#fce8fc] text-sidebar-custom-active"
                                 : "text-gray-900 hover:bg-gray-50"
@@ -481,20 +527,107 @@ const GamificationPage = () => {
                               />
                             )}
                           </button>
+
+                          {draftEvent === "posts" && (
+                            <div className="space-y-2 border-t border-gray-100 px-3 py-2">
+                              <div className="flex gap-2">
+                                <input
+                                  type="text"
+                                  inputMode="numeric"
+                                  autoComplete="off"
+                                  placeholder="eg: 4"
+                                  value={draftPostsCount}
+                                  onChange={(e) => {
+                                    const v = e.target.value.replace(
+                                      /\D/g,
+                                      ""
+                                    );
+                                    dispatch(setDraftPostsCount(v));
+                                  }}
+                                  className="h-10 min-w-0 flex-1 basis-0 rounded-[10px] border-2 border-gray-200 bg-white px-3 text-left text-sm font-light text-black placeholder:text-gray-400 outline-none focus:border-sidebar-custom-active"
+                                />
+                                <div className="min-w-0 flex-1 basis-0">
+                                  <Popover
+                                    open={postsDurationOpen}
+                                    onOpenChange={setPostsDurationOpen}
+                                  >
+                                    <PopoverTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className={cn(
+                                          "flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] border-2 bg-transparent px-3 text-left text-sm font-light transition-all outline-none select-none",
+                                          "border-gray-200 focus-visible:border-sidebar-custom-active focus-visible:ring-0",
+                                          postsDurationOpen &&
+                                            "border-sidebar-custom-active",
+                                          draftPostsDuration
+                                            ? "text-black"
+                                            : "text-gray-400"
+                                        )}
+                                      >
+                                        <span className="truncate">
+                                          {draftPostsDuration
+                                            ? postsDurationLabel(
+                                                draftPostsDuration
+                                              )
+                                            : "Select duration"}
+                                        </span>
+                                        {postsDurationOpen ? (
+                                          <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
+                                        ) : (
+                                          <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
+                                        )}
+                                      </button>
+                                    </PopoverTrigger>
+                                    <PopoverContent
+                                      className="z-70 w-(--radix-popper-anchor-width) max-w-(--radix-popper-available-width) rounded-[10px] border border-gray-200 p-1 shadow-lg"
+                                      align="start"
+                                      side="bottom"
+                                      sideOffset={4}
+                                    >
+                                      <div className="flex flex-col py-0.5">
+                                        {POSTS_DURATIONS.map((d) => (
+                                          <button
+                                            key={d.id}
+                                            type="button"
+                                            onClick={() => {
+                                              dispatch(
+                                                setDraftPostsDuration(d.id)
+                                              );
+                                              setPostsDurationOpen(false);
+                                            }}
+                                            className={cn(
+                                              "w-full rounded-[8px] px-3 py-2.5 text-left text-sm font-light transition-colors",
+                                              draftPostsDuration === d.id
+                                                ? "bg-[#fce8fc] text-sidebar-custom-active"
+                                                : "text-gray-900 hover:bg-gray-50"
+                                            )}
+                                          >
+                                            {d.label}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </PopoverContent>
+                                  </Popover>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
                           <button
                             type="button"
                             onClick={() =>
-                              dispatch(chooseRewardEventDraft("onboarded"))
+                              dispatch(commitOnboardedRewardEvent())
                             }
                             className={cn(
-                              "flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left text-sm font-light transition-colors",
-                              draftEvent === "onboarded"
+                              "flex h-10 w-full items-center justify-between gap-2 px-3 text-left text-sm font-light transition-colors",
+                              !eventPopoverFooterVisible && "rounded-b-[10px]",
+                              rewardEvent === "onboarded"
                                 ? "bg-[#fce8fc] text-sidebar-custom-active"
                                 : "text-gray-900 hover:bg-gray-50"
                             )}
                           >
                             <span>Is Onboarded</span>
-                            {draftEvent === "onboarded" && (
+                            {rewardEvent === "onboarded" && (
                               <Check
                                 className="size-4 shrink-0 text-sidebar-custom-active"
                                 strokeWidth={2.5}
@@ -539,6 +672,19 @@ const GamificationPage = () => {
                                         </p>
                                       </TooltipContent>
                                     )}
+                                  {!canSaveRewardEvent &&
+                                    draftEvent === "posts" && (
+                                      <TooltipContent
+                                        side="bottom"
+                                        sideOffset={6}
+                                        className={saveHintTooltipClassName}
+                                      >
+                                        <p>
+                                          Enter post count and select a
+                                          duration to continue
+                                        </p>
+                                      </TooltipContent>
+                                    )}
                                 </Tooltip>
                               </TooltipProvider>
                             </div>
@@ -550,8 +696,11 @@ const GamificationPage = () => {
 
                   {/* Reward With */}
                   <div className="space-y-1.5">
-                    <Label className="text-[0.85rem] font-normal text-gray-600 inline-flex items-center">
-                      Reward with<sup className="text-red-500 ml-0.5 text-[0.7rem] leading-none">*</sup>
+                    <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
+                      Reward with
+                      <sup className="ml-px translate-y-[-0.08em] text-[0.6em] font-normal leading-none text-red-500">
+                        *
+                      </sup>
                     </Label>
                     <Popover
                       open={rewardWithPopoverOpen}
@@ -571,13 +720,9 @@ const GamificationPage = () => {
                           )}
                         >
                           <span className="truncate">
-                            {!rewardWith && "Select a reward"}
-                            {rewardWith === "bonus" &&
-                              `Flat $${bonusAmount || "X"} bonus`}
-                            {rewardWith === "commission" &&
-                              (commissionTierId
-                                ? `Upgrade to ${commissionTierDisplayLabel}`
-                                : "Upgrade commission tier")}
+                            {rewardWith === "bonus"
+                              ? `Flat $${bonusAmount || "X"} bonus`
+                              : "Select a reward"}
                           </span>
                           {rewardWithPopoverOpen ? (
                             <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
@@ -648,56 +793,12 @@ const GamificationPage = () => {
                           )}
 
                           <div
-                            className={cn(
-                              "flex h-10 w-full items-center gap-1 px-3 transition-colors",
-                              rewardWith === "commission"
-                                ? "bg-[#fce8fc] text-sidebar-custom-active"
-                                : "text-gray-900 hover:bg-gray-50"
-                            )}
+                            className="flex h-10 w-full items-center px-3 text-sm font-light text-gray-400 cursor-not-allowed select-none"
+                            aria-disabled="true"
                           >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                if (
-                                  rewardWith === "commission" &&
-                                  commissionTierId
-                                ) {
-                                  dispatch(openCommissionTierStepForEdit());
-                                } else {
-                                  dispatch(openCommissionRewardFlow());
-                                }
-                              }}
-                              className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-between gap-2 py-0 text-left text-sm font-light leading-none"
-                            >
-                              <span className="truncate leading-normal">
-                                {rewardWith === "commission" &&
-                                commissionTierId
-                                  ? `Upgrade to ${commissionTierDisplayLabel}`
-                                  : "Upgrade commission tier"}
-                              </span>
-                              {rewardWith === "commission" &&
-                                !commissionTierId && (
-                                  <Check
-                                    className="size-4 shrink-0 text-sidebar-custom-active"
-                                    strokeWidth={2.5}
-                                  />
-                                )}
-                            </button>
-                            {rewardWith === "commission" &&
-                              commissionTierId && (
-                                <button
-                                  type="button"
-                                  aria-label="Edit commission tier"
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    dispatch(openCommissionTierStepForEdit());
-                                  }}
-                                  className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-custom-active transition-colors hover:bg-white/80"
-                                >
-                                  <Pencil className="size-3.5" strokeWidth={2} />
-                                </button>
-                              )}
+                            <span className="truncate">
+                              Upgrade commission tier
+                            </span>
                           </div>
 
                           {rewardWithFooterVisible && (
@@ -765,10 +866,16 @@ const GamificationPage = () => {
 
                     {isTimeBound && (
                       <div className="animate-in fade-in slide-in-from-top-2 duration-200 space-y-1.5">
-                        <Label className="text-[0.85rem] font-normal text-gray-600">
-                          End date<sup className="text-red-500 ml-0.5 text-[0.7rem] leading-none">*</sup>
+                        <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
+                          End date
+                          <sup className="ml-px translate-y-[-0.08em] text-[0.6em] font-normal leading-none text-red-500">
+                            *
+                          </sup>
                         </Label>
-                        <Popover>
+                        <Popover
+                          open={endDatePopoverOpen}
+                          onOpenChange={setEndDatePopoverOpen}
+                        >
                           <PopoverTrigger asChild>
                             <Button
                               variant={"outline"}
@@ -795,13 +902,14 @@ const GamificationPage = () => {
                             <Calendar
                               mode="single"
                               selected={date}
-                              onSelect={(d) =>
+                              onSelect={(d) => {
                                 dispatch(
                                   setEndDate(
                                     d ? format(d, "yyyy-MM-dd") : null
                                   )
-                                )
-                              }
+                                );
+                                if (d) setEndDatePopoverOpen(false);
+                              }}
                               disabled={(date) => {
                                 const today = new Date();
                                 today.setHours(0, 0, 0, 0);
@@ -854,7 +962,10 @@ const GamificationPage = () => {
                                 !rewardWithComplete ||
                                 (isTimeBound && !endDate)
                               }
-                              onClick={() => dispatch(setDialogOpen(false))}
+                              onClick={() => {
+                                dispatch(setDialogOpen(false));
+                                setRewardCreatedToast(true);
+                              }}
                               className="w-full h-10 rounded-[10px] bg-sidebar-custom-active font-normal text-white shadow-none transition-all hover:bg-sidebar-custom-active/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               Create Reward
@@ -873,8 +984,9 @@ const GamificationPage = () => {
                                 ? "Please select an end date"
                                 : !rewardEvent || !rewardWith
                                   ? "Choose a reward trigger and a reward to continue"
-                                  : rewardWith === "commission" && !commissionTierId
-                                    ? "Select and save a commission tier"
+                                  : rewardEvent === "posts" &&
+                                      (!postsTimesCount || !postsDuration)
+                                    ? "Complete posts frequency and duration"
                                     : "Choose a reward trigger and a reward to continue"}
                             </p>
                           </TooltipContent>
@@ -964,6 +1076,24 @@ const GamificationPage = () => {
           </div>
         ))}
       </div>
+
+      {rewardCreatedToast && (
+        <div
+          role="status"
+          aria-live="polite"
+          className="animate-in fade-in slide-in-from-bottom-4 fixed bottom-8 left-1/2 z-200 flex -translate-x-1/2 items-center gap-2 rounded-full bg-[#2d2d2d] px-3 py-1.5 shadow-md duration-300"
+        >
+          <span
+            className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[#7ed9be]"
+            aria-hidden
+          >
+            <Check className="size-3 text-gray-900" strokeWidth={2.5} />
+          </span>
+          <span className="text-[0.8125rem] font-normal leading-none tracking-tight text-white">
+            Reward Created!
+          </span>
+        </div>
+      )}
     </div>
   );
 };

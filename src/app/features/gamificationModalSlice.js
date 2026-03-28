@@ -4,6 +4,11 @@ const initialState = {
   dialogOpen: false,
   rewardEvent: "",
   salesThreshold: "",
+  /** Posts event: count + duration id */
+  postsTimesCount: "",
+  postsDuration: "",
+  draftPostsCount: "",
+  draftPostsDuration: "",
   rewardWith: "",
   bonusAmount: "",
   /** Selected commission tier id (after tier step save) */
@@ -46,6 +51,8 @@ export const gamificationModalSlice = createSlice({
       state.eventPopoverFooterVisible = false;
       state.draftEvent = "";
       state.draftSales = "";
+      state.draftPostsCount = "";
+      state.draftPostsDuration = "";
     },
     chooseRewardEventDraft: (state, action) => {
       state.draftEvent = action.payload;
@@ -53,18 +60,61 @@ export const gamificationModalSlice = createSlice({
       if (action.payload !== "sales") {
         state.draftSales = "";
       }
+      if (action.payload !== "posts") {
+        state.draftPostsCount = "";
+        state.draftPostsDuration = "";
+      } else {
+        state.draftPostsCount = state.postsTimesCount || "";
+        state.draftPostsDuration = state.postsDuration || "";
+      }
     },
     setDraftSales: (state, action) => {
       state.draftSales = action.payload;
     },
+    setDraftPostsCount: (state, action) => {
+      state.draftPostsCount = action.payload;
+    },
+    setDraftPostsDuration: (state, action) => {
+      state.draftPostsDuration = action.payload;
+    },
     commitRewardEventDraft: (state) => {
-      state.rewardEvent = state.draftEvent;
-      state.salesThreshold =
-        state.draftEvent === "sales" ? state.draftSales.trim() : "";
+      const ev = state.draftEvent;
+      state.rewardEvent = ev;
+      state.salesThreshold = ev === "sales" ? state.draftSales.trim() : "";
+      if (ev === "posts") {
+        state.postsTimesCount = state.draftPostsCount.trim();
+        state.postsDuration = state.draftPostsDuration;
+      } else {
+        state.postsTimesCount = "";
+        state.postsDuration = "";
+      }
       state.eventPopoverOpen = false;
       state.eventPopoverFooterVisible = false;
       state.draftEvent = "";
       state.draftSales = "";
+      state.draftPostsCount = "";
+      state.draftPostsDuration = "";
+      state.rewardWithPopoverOpen = true;
+      state.draftRewardWith = "";
+      state.rewardWithFooterVisible = false;
+      state.draftBonusAmount = "";
+    },
+    /** Onboarded: no extra fields or Cancel/Save — apply and go to Reward with */
+    commitOnboardedRewardEvent: (state) => {
+      state.rewardEvent = "onboarded";
+      state.salesThreshold = "";
+      state.postsTimesCount = "";
+      state.postsDuration = "";
+      state.eventPopoverOpen = false;
+      state.eventPopoverFooterVisible = false;
+      state.draftEvent = "";
+      state.draftSales = "";
+      state.draftPostsCount = "";
+      state.draftPostsDuration = "";
+      state.rewardWithPopoverOpen = true;
+      state.draftRewardWith = "";
+      state.rewardWithFooterVisible = false;
+      state.draftBonusAmount = "";
     },
     setRewardWithPopoverOpen: (state, action) => {
       const open = action.payload;
@@ -76,7 +126,9 @@ export const gamificationModalSlice = createSlice({
     chooseRewardWithDraft: (state, action) => {
       state.draftRewardWith = action.payload;
       state.rewardWithFooterVisible = true;
-      if (action.payload !== "bonus") {
+      if (action.payload === "bonus") {
+        state.draftBonusAmount = state.bonusAmount;
+      } else {
         state.draftBonusAmount = "";
       }
     },
@@ -145,7 +197,10 @@ export const {
   setEventPopoverOpen,
   chooseRewardEventDraft,
   setDraftSales,
+  setDraftPostsCount,
+  setDraftPostsDuration,
   commitRewardEventDraft,
+  commitOnboardedRewardEvent,
   setRewardWithPopoverOpen,
   chooseRewardWithDraft,
   setDraftBonusAmount,
@@ -161,6 +216,14 @@ export const selectDialogOpen = (state) => state.gamificationModal.dialogOpen;
 export const selectRewardEvent = (state) => state.gamificationModal.rewardEvent;
 export const selectSalesThreshold = (state) =>
   state.gamificationModal.salesThreshold;
+export const selectPostsTimesCount = (state) =>
+  state.gamificationModal.postsTimesCount;
+export const selectPostsDuration = (state) =>
+  state.gamificationModal.postsDuration;
+export const selectDraftPostsCount = (state) =>
+  state.gamificationModal.draftPostsCount;
+export const selectDraftPostsDuration = (state) =>
+  state.gamificationModal.draftPostsDuration;
 export const selectRewardWith = (state) => state.gamificationModal.rewardWith;
 export const selectBonusAmount = (state) => state.gamificationModal.bonusAmount;
 export const selectCommissionTierId = (state) =>
