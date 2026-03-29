@@ -84,6 +84,7 @@ import {
   setTimeBound,
 } from "@/app/features/gamificationModalSlice";
 
+// This is just some fake data for the commission tiers to make the UI work.
 const COMMISSION_TIERS = [
   { id: "tier-1", label: "Tier Name Here" },
   { id: "tier-2", label: "Tier Name Here" },
@@ -136,6 +137,7 @@ const GamificationPage = () => {
   const [postsDurationOpen, setPostsDurationOpen] = useState(false);
   const [endDatePopoverOpen, setEndDatePopoverOpen] = useState(false);
   const [rewardCreatedToast, setRewardCreatedToast] = useState(false);
+  // This is a bit of a hack to prevent the popover from closing when it shouldn't.
   const rewardWithDismissShieldUntilRef = useRef(0);
   const isTimeBound = useSelector(selectIsTimeBound);
   const endDate = useSelector(selectEndDate);
@@ -278,9 +280,9 @@ const GamificationPage = () => {
 
   return (
     <div className="relative flex flex-col items-center">
-      {/* Main Banner with Grid */}
+      {/* This is the main banner at the top of the page. */}
       <div className="relative w-full h-[320px] border border-gamification-grid-border rounded-[15px] overflow-hidden bg-white mb-[-60px] z-0">
-        {/* Background Grid */}
+        {/* A decorative grid in the background. */}
         <div
           className="absolute inset-0 grid grid-cols-13"
           style={{ gridTemplateRows: "repeat(4, 1fr) 0.33fr" }}
@@ -300,12 +302,12 @@ const GamificationPage = () => {
           )}
         </div>
 
-        {/* Local White Fade Overlay behind text */}
+        {/* This creates a soft, blurry overlay to make the text easier to read. */}
         <div className="absolute inset-0 z-5 flex items-center justify-center">
           <div className="w-[500px] h-[240px] bg-white/80 blur-3xl rounded-full" />
         </div>
 
-        {/* Content Overlay */}
+        {/* The actual content on top of the banner. */}
         <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-6 z-10 pb-16">
           <h2 className="text-[1.75rem] font-normal text-gamification-heading mb-1 tracking-tight">
             Gamify your Campaign
@@ -441,7 +443,7 @@ const GamificationPage = () => {
                     </DialogHeader>
 
                     <div className="space-y-4">
-                  {/* Reward Event */}
+                  {/* This is where the user chooses what kind of event will trigger the reward. */}
                   <div className="space-y-1.5">
                     <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
                       Reward event
@@ -729,7 +731,7 @@ const GamificationPage = () => {
                     </Popover>
                   </div>
 
-                  {/* Reward With */}
+                  {/* This is where the user chooses the actual reward. */}
                   <div className="space-y-1.5">
                     <Label className="inline-flex items-baseline gap-0 text-[0.85rem] font-normal text-gray-600">
                       Reward with
@@ -961,7 +963,7 @@ const GamificationPage = () => {
                     </Popover>
                   </div>
 
-                  {/* Time Bound Switch */}
+                  {/* A switch to make the reward time-limited. */}
                   <div className="space-y-3 py-0.5">
                     <div className="flex items-start justify-between">
                       <div className="space-y-0.5">

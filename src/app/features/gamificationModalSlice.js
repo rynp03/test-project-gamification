@@ -4,18 +4,18 @@ const initialState = {
   dialogOpen: false,
   rewardEvent: "",
   salesThreshold: "",
-  /** Posts event: count + duration id */
+  // For post-related events, we need to know how many posts and over what period.
   postsTimesCount: "",
   postsDuration: "",
   draftPostsCount: "",
   draftPostsDuration: "",
   rewardWith: "",
   bonusAmount: "",
-  /** Selected commission tier id (after tier step save) */
+  // This is the commission tier that's been saved.
   commissionTierId: "",
-  /** Full-screen tier picker inside the same dialog */
+  // When the user is picking a tier, this is true.
   commissionTierStepActive: false,
-  /** Tier id selected in the tier step (before Save) */
+  // While the user is picking a tier, this holds their selection before they save.
   commissionTierDraftId: "",
   isTimeBound: false,
   endDate: null,
@@ -24,7 +24,7 @@ const initialState = {
   draftSales: "",
   eventPopoverFooterVisible: false,
   rewardWithPopoverOpen: false,
-  /** Open Reward with on next frame after event popover closes (avoids Radix dismiss race) */
+  // This helps us avoid a weird visual bug with popovers opening and closing too fast.
   pendingOpenRewardWithPopover: false,
   draftRewardWith: "",
   draftBonusAmount: "",
@@ -107,7 +107,6 @@ export const gamificationModalSlice = createSlice({
         state.commissionTierDraftId = "";
       }
     },
-    /** Onboarded: no extra fields or Cancel/Save — apply and go to Reward with */
     commitOnboardedRewardEvent: (state) => {
       state.rewardEvent = "onboarded";
       state.salesThreshold = "";
@@ -175,7 +174,7 @@ export const gamificationModalSlice = createSlice({
         state.commissionTierDraftId = "";
       }
     },
-    /** Pick commission from reward popover: skip Cancel/Save, open tier step */
+    // Shortcut to open the tier selection step directly from the reward popover.
     openCommissionRewardFlow: (state) => {
       if (state.rewardWith !== "commission") {
         state.commissionTierId = "";
