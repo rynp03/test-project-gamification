@@ -27,7 +27,7 @@ const Sidebar = () => {
 
   return (
     <aside className="w-60 h-screen bg-sidebar-custom-bg flex flex-col p-4 border-r border-sidebar-custom-active/5">
-      {/* Header */}
+      {/* The logo and title at the top of the sidebar. */}
       <div className="flex items-center gap-2 mb-8 mt-2 px-2">
         <div className="w-9 h-9 rounded-xl bg-sidebar-custom-active flex items-center justify-center shadow-lg shadow-sidebar-custom-active/20">
           <Hexagon className="text-white size-5 fill-white/20" />
@@ -35,7 +35,7 @@ const Sidebar = () => {
         <h1 className="text-xl font-bold text-sidebar-custom-active tracking-tight">Acme</h1>
       </div>
 
-      {/* Navigation */}
+      {/* The main navigation links. */}
       <nav className="flex-1 flex flex-col gap-1">
         {navItems.map((item) => {
           const isActive = item.id === activeId;
@@ -61,7 +61,7 @@ const Sidebar = () => {
         })}
       </nav>
 
-      {/* Footer / Settings */}
+      {/* The settings button at the bottom. */}
       <div className="mt-auto pb-2">
         <Button
           variant="ghost"

@@ -7,7 +7,7 @@ import { Bell } from "lucide-react"
 export default function App() {
   const activeId = useSelector(selectActiveId)
 
-  // Simple mapping of labels based on activeId
+  // A simple function to get the page title based on the active navigation item.
   const getPageTitle = (id) => {
     switch (id) {
       case 'home': return 'Home';
