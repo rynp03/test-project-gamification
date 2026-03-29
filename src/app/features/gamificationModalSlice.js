@@ -24,6 +24,8 @@ const initialState = {
   draftSales: "",
   eventPopoverFooterVisible: false,
   rewardWithPopoverOpen: false,
+  /** Open Reward with on next frame after event popover closes (avoids Radix dismiss race) */
+  pendingOpenRewardWithPopover: false,
   draftRewardWith: "",
   draftBonusAmount: "",
   rewardWithFooterVisible: false,
@@ -94,10 +96,16 @@ export const gamificationModalSlice = createSlice({
       state.draftSales = "";
       state.draftPostsCount = "";
       state.draftPostsDuration = "";
-      state.rewardWithPopoverOpen = true;
+      state.pendingOpenRewardWithPopover = true;
       state.draftRewardWith = "";
       state.rewardWithFooterVisible = false;
       state.draftBonusAmount = "";
+      if (ev !== "sales" && state.rewardWith === "commission") {
+        state.rewardWith = "";
+        state.commissionTierId = "";
+        state.commissionTierStepActive = false;
+        state.commissionTierDraftId = "";
+      }
     },
     /** Onboarded: no extra fields or Cancel/Save — apply and go to Reward with */
     commitOnboardedRewardEvent: (state) => {
@@ -111,17 +119,29 @@ export const gamificationModalSlice = createSlice({
       state.draftSales = "";
       state.draftPostsCount = "";
       state.draftPostsDuration = "";
-      state.rewardWithPopoverOpen = true;
+      state.pendingOpenRewardWithPopover = true;
       state.draftRewardWith = "";
       state.rewardWithFooterVisible = false;
       state.draftBonusAmount = "";
+      if (state.rewardWith === "commission") {
+        state.rewardWith = "";
+        state.commissionTierId = "";
+        state.commissionTierStepActive = false;
+        state.commissionTierDraftId = "";
+      }
     },
     setRewardWithPopoverOpen: (state, action) => {
       const open = action.payload;
+      state.pendingOpenRewardWithPopover = false;
       state.rewardWithPopoverOpen = open;
       state.rewardWithFooterVisible = false;
       state.draftRewardWith = "";
       state.draftBonusAmount = "";
+    },
+    flushPendingRewardWithPopoverOpen: (state) => {
+      if (!state.pendingOpenRewardWithPopover) return;
+      state.pendingOpenRewardWithPopover = false;
+      state.rewardWithPopoverOpen = true;
     },
     chooseRewardWithDraft: (state, action) => {
       state.draftRewardWith = action.payload;
@@ -202,6 +222,7 @@ export const {
   commitRewardEventDraft,
   commitOnboardedRewardEvent,
   setRewardWithPopoverOpen,
+  flushPendingRewardWithPopoverOpen,
   chooseRewardWithDraft,
   setDraftBonusAmount,
   commitRewardWithDraft,
@@ -242,6 +263,8 @@ export const selectEventPopoverFooterVisible = (state) =>
   state.gamificationModal.eventPopoverFooterVisible;
 export const selectRewardWithPopoverOpen = (state) =>
   state.gamificationModal.rewardWithPopoverOpen;
+export const selectPendingOpenRewardWithPopover = (state) =>
+  state.gamificationModal.pendingOpenRewardWithPopover;
 export const selectDraftRewardWith = (state) =>
   state.gamificationModal.draftRewardWith;
 export const selectDraftBonusAmount = (state) =>

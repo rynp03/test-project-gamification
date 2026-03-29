@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  Pencil,
 } from "lucide-react";
 import {
   Dialog,
@@ -44,9 +45,13 @@ import {
   commitRewardEventDraft,
   commitOnboardedRewardEvent,
   commitRewardWithDraft,
+  flushPendingRewardWithPopoverOpen,
+  openCommissionRewardFlow,
+  openCommissionTierStepForEdit,
   saveCommissionTierStep,
   selectBonusAmount,
   selectCommissionTierDraftId,
+  selectCommissionTierId,
   selectCommissionTierStepActive,
   selectDialogOpen,
   selectDraftBonusAmount,
@@ -64,6 +69,7 @@ import {
   selectRewardWithFooterVisible,
   selectPostsDuration,
   selectPostsTimesCount,
+  selectPendingOpenRewardWithPopover,
   selectRewardWithPopoverOpen,
   selectSalesThreshold,
   setCommissionTierDraftId,
@@ -114,11 +120,15 @@ const GamificationPage = () => {
   const rewardWith = useSelector(selectRewardWith);
   const bonusAmount = useSelector(selectBonusAmount);
   const rewardWithPopoverOpen = useSelector(selectRewardWithPopoverOpen);
+  const pendingOpenRewardWithPopover = useSelector(
+    selectPendingOpenRewardWithPopover
+  );
   const draftRewardWith = useSelector(selectDraftRewardWith);
   const draftBonusAmount = useSelector(selectDraftBonusAmount);
   const rewardWithFooterVisible = useSelector(selectRewardWithFooterVisible);
   const commissionTierStepActive = useSelector(selectCommissionTierStepActive);
   const commissionTierDraftId = useSelector(selectCommissionTierDraftId);
+  const commissionTierId = useSelector(selectCommissionTierId);
   const postsTimesCount = useSelector(selectPostsTimesCount);
   const postsDuration = useSelector(selectPostsDuration);
   const draftPostsCount = useSelector(selectDraftPostsCount);
@@ -127,6 +137,8 @@ const GamificationPage = () => {
   const [postsDurationOpen, setPostsDurationOpen] = useState(false);
   const [endDatePopoverOpen, setEndDatePopoverOpen] = useState(false);
   const [rewardCreatedToast, setRewardCreatedToast] = useState(false);
+  /** Ignore outside-dismiss + spurious onOpenChange(false) right after auto-open (event popover teardown) */
+  const rewardWithDismissShieldUntilRef = useRef(0);
   const isTimeBound = useSelector(selectIsTimeBound);
   const endDate = useSelector(selectEndDate);
   const eventPopoverOpen = useSelector(selectEventPopoverOpen);
@@ -154,6 +166,28 @@ const GamificationPage = () => {
   useEffect(() => {
     if (!isTimeBound) setEndDatePopoverOpen(false);
   }, [isTimeBound]);
+
+  useEffect(() => {
+    if (!pendingOpenRewardWithPopover) return;
+    let cancelled = false;
+    const t = window.setTimeout(() => {
+      if (cancelled) return;
+      rewardWithDismissShieldUntilRef.current = Date.now() + 900;
+      dispatch(flushPendingRewardWithPopoverOpen());
+    }, 150);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(t);
+    };
+  }, [pendingOpenRewardWithPopover, dispatch]);
+
+  const rewardWithShieldActive = () =>
+    Date.now() < rewardWithDismissShieldUntilRef.current;
+
+  const handleRewardWithOpenChange = (open) => {
+    if (!open && rewardWithShieldActive()) return;
+    dispatch(setRewardWithPopoverOpen(open));
+  };
 
   const date = endDate
     ? parse(endDate, "yyyy-MM-dd", new Date())
@@ -206,17 +240,22 @@ const GamificationPage = () => {
         !!(postsTimesCount && postsTimesCount.trim().length > 0) &&
         !!postsDuration));
 
+  const commissionTierPickEnabled = rewardEvent === "sales";
+
   const rewardWithComplete =
-    rewardWith === "bonus" &&
-    !!(bonusAmount && bonusAmount.trim().length > 0);
+    (rewardWith === "bonus" &&
+      !!(bonusAmount && bonusAmount.trim().length > 0)) ||
+    (rewardWith === "commission" &&
+      commissionTierPickEnabled &&
+      !!(commissionTierId && commissionTierId.length > 0));
 
   // Updated grid pattern to better match the screenshot
   // 0: white, 1: #fef1fe (bg-gamification-grid-1), 2: #fefbfe (bg-gamification-grid-2)
   const gridPattern = [
-    [0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0],
-    [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-    [2, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 2, 2],
-    [2, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
+    [0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0],
+    [2, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 2, 0, 2, 0, 0, 0, 0, 0, 0, 1, 2],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 2, 0],
     [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
   ];
 
@@ -704,9 +743,7 @@ const GamificationPage = () => {
                     </Label>
                     <Popover
                       open={rewardWithPopoverOpen}
-                      onOpenChange={(open) =>
-                        dispatch(setRewardWithPopoverOpen(open))
-                      }
+                      onOpenChange={handleRewardWithOpenChange}
                     >
                       <PopoverTrigger asChild>
                         <button
@@ -720,9 +757,13 @@ const GamificationPage = () => {
                           )}
                         >
                           <span className="truncate">
-                            {rewardWith === "bonus"
-                              ? `Flat $${bonusAmount || "X"} bonus`
-                              : "Select a reward"}
+                            {!rewardWith && "Select a reward"}
+                            {rewardWith === "bonus" &&
+                              `Flat $${bonusAmount || "X"} bonus`}
+                            {rewardWith === "commission" &&
+                              (commissionTierId
+                                ? `Upgrade to ${tierLabelById(commissionTierId)}`
+                                : "Upgrade commission tier")}
                           </span>
                           {rewardWithPopoverOpen ? (
                             <ChevronUp className="size-4 shrink-0 text-muted-foreground" />
@@ -736,6 +777,16 @@ const GamificationPage = () => {
                         align="start"
                         side="bottom"
                         sideOffset={4}
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                        onInteractOutside={(e) => {
+                          if (rewardWithShieldActive()) e.preventDefault();
+                        }}
+                        onPointerDownOutside={(e) => {
+                          if (rewardWithShieldActive()) e.preventDefault();
+                        }}
+                        onFocusOutside={(e) => {
+                          if (rewardWithShieldActive()) e.preventDefault();
+                        }}
                       >
                         <div className="flex flex-col">
                           <button
@@ -792,14 +843,82 @@ const GamificationPage = () => {
                             </div>
                           )}
 
-                          <div
-                            className="flex h-10 w-full items-center px-3 text-sm font-light text-gray-400 cursor-not-allowed select-none"
-                            aria-disabled="true"
-                          >
-                            <span className="truncate">
-                              Upgrade commission tier
-                            </span>
-                          </div>
+                          {commissionTierPickEnabled ? (
+                            <div
+                              className={cn(
+                                "flex h-10 w-full items-center gap-1 px-3 transition-colors",
+                                rewardWith === "commission"
+                                  ? "bg-[#fce8fc] text-sidebar-custom-active"
+                                  : "text-gray-900 hover:bg-gray-50",
+                                !rewardWithFooterVisible &&
+                                  "rounded-b-[10px]"
+                              )}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (
+                                    rewardWith === "commission" &&
+                                    commissionTierId
+                                  ) {
+                                    dispatch(
+                                      openCommissionTierStepForEdit()
+                                    );
+                                  } else {
+                                    dispatch(openCommissionRewardFlow());
+                                  }
+                                }}
+                                className="flex h-full min-h-0 min-w-0 flex-1 items-center justify-between gap-2 py-0 text-left text-sm font-light leading-none"
+                              >
+                                <span className="truncate leading-normal">
+                                  {rewardWith === "commission" &&
+                                  commissionTierId
+                                    ? `Upgrade to ${tierLabelById(commissionTierId)}`
+                                    : "Upgrade commission tier"}
+                                </span>
+                                {rewardWith === "commission" &&
+                                  !commissionTierId && (
+                                    <Check
+                                      className="size-4 shrink-0 text-sidebar-custom-active"
+                                      strokeWidth={2.5}
+                                    />
+                                  )}
+                              </button>
+                              {rewardWith === "commission" &&
+                                commissionTierId && (
+                                  <button
+                                    type="button"
+                                    aria-label="Edit commission tier"
+                                    onClick={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      dispatch(
+                                        openCommissionTierStepForEdit()
+                                      );
+                                    }}
+                                    className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-custom-active transition-colors hover:bg-white/80"
+                                  >
+                                    <Pencil
+                                      className="size-3.5"
+                                      strokeWidth={2}
+                                    />
+                                  </button>
+                                )}
+                            </div>
+                          ) : (
+                            <div
+                              className={cn(
+                                "flex h-10 w-full items-center px-3 text-sm font-light text-gray-400 cursor-not-allowed select-none",
+                                !rewardWithFooterVisible &&
+                                  "rounded-b-[10px]"
+                              )}
+                              aria-disabled="true"
+                            >
+                              <span className="truncate">
+                                Upgrade commission tier
+                              </span>
+                            </div>
+                          )}
 
                           {rewardWithFooterVisible && (
                             <div className="flex gap-2 border-t border-gray-100 p-2">
@@ -987,7 +1106,11 @@ const GamificationPage = () => {
                                   : rewardEvent === "posts" &&
                                       (!postsTimesCount || !postsDuration)
                                     ? "Complete posts frequency and duration"
-                                    : "Choose a reward trigger and a reward to continue"}
+                                    : rewardEvent === "sales" &&
+                                        rewardWith === "commission" &&
+                                        !commissionTierId
+                                      ? "Select and save a commission tier"
+                                      : "Choose a reward trigger and a reward to continue"}
                             </p>
                           </TooltipContent>
                         )}
