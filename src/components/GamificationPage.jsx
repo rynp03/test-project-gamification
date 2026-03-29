@@ -84,7 +84,6 @@ import {
   setTimeBound,
 } from "@/app/features/gamificationModalSlice";
 
-/** Mock tiers — same label as design; ids distinguish rows */
 const COMMISSION_TIERS = [
   { id: "tier-1", label: "Tier Name Here" },
   { id: "tier-2", label: "Tier Name Here" },
@@ -137,7 +136,6 @@ const GamificationPage = () => {
   const [postsDurationOpen, setPostsDurationOpen] = useState(false);
   const [endDatePopoverOpen, setEndDatePopoverOpen] = useState(false);
   const [rewardCreatedToast, setRewardCreatedToast] = useState(false);
-  /** Ignore outside-dismiss + spurious onOpenChange(false) right after auto-open (event popover teardown) */
   const rewardWithDismissShieldUntilRef = useRef(0);
   const isTimeBound = useSelector(selectIsTimeBound);
   const endDate = useSelector(selectEndDate);
@@ -249,8 +247,6 @@ const GamificationPage = () => {
       commissionTierPickEnabled &&
       !!(commissionTierId && commissionTierId.length > 0));
 
-  // Updated grid pattern to better match the screenshot
-  // 0: white, 1: #fef1fe (bg-gamification-grid-1), 2: #fefbfe (bg-gamification-grid-2)
   const gridPattern = [
     [0, 0, 0, 0, 0, 2, 2, 0, 0, 0, 0, 0, 0],
     [2, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0],
