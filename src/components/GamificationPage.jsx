@@ -135,6 +135,7 @@ const GamificationPage = () => {
   const draftPostsDuration = useSelector(selectDraftPostsDuration);
   const [tierPickerOpen, setTierPickerOpen] = useState(false);
   const [postsDurationOpen, setPostsDurationOpen] = useState(false);
+  const postsCountInputRef = useRef(null);
   const [endDatePopoverOpen, setEndDatePopoverOpen] = useState(false);
   const [rewardCreatedToast, setRewardCreatedToast] = useState(false);
   // This is a bit of a hack to prevent the popover from closing when it shouldn't.
@@ -151,10 +152,7 @@ const GamificationPage = () => {
   useEffect(() => {
     if (draftEvent !== "posts") {
       setPostsDurationOpen(false);
-      return;
     }
-    const id = requestAnimationFrame(() => setPostsDurationOpen(true));
-    return () => cancelAnimationFrame(id);
   }, [draftEvent]);
 
   useEffect(() => {
@@ -164,7 +162,12 @@ const GamificationPage = () => {
   }, [rewardCreatedToast]);
 
   useEffect(() => {
-    if (!isTimeBound) setEndDatePopoverOpen(false);
+    if (!isTimeBound) {
+      setEndDatePopoverOpen(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setEndDatePopoverOpen(true));
+    return () => cancelAnimationFrame(id);
   }, [isTimeBound]);
 
   useEffect(() => {
@@ -201,6 +204,28 @@ const GamificationPage = () => {
     draftPostsCount.trim().length > 0 &&
     !Number.isNaN(Number(draftPostsCount.replace(/,/g, "")));
   const postsFormValid = postsCountValid && !!draftPostsDuration;
+
+  useEffect(() => {
+    if (draftEvent === "posts" && !postsCountValid && postsDurationOpen) {
+      setPostsDurationOpen(false);
+    }
+  }, [draftEvent, postsCountValid, postsDurationOpen]);
+
+  useEffect(() => {
+    if (draftEvent !== "posts" || !eventPopoverOpen) return;
+    const id = requestAnimationFrame(() => {
+      postsCountInputRef.current?.focus();
+    });
+    return () => cancelAnimationFrame(id);
+  }, [draftEvent, eventPopoverOpen]);
+
+  useEffect(() => {
+    if (commissionTierStepActive) {
+      setTierPickerOpen(true);
+    } else {
+      setTierPickerOpen(false);
+    }
+  }, [commissionTierStepActive]);
 
   const canSaveRewardEvent =
     (draftEvent === "sales" && salesAmountValid) ||
@@ -569,6 +594,7 @@ const GamificationPage = () => {
                             <div className="space-y-2 border-t border-gray-100 px-3 py-2">
                               <div className="flex gap-2">
                                 <input
+                                  ref={postsCountInputRef}
                                   type="text"
                                   inputMode="numeric"
                                   autoComplete="off"
@@ -591,6 +617,12 @@ const GamificationPage = () => {
                                     <PopoverTrigger asChild>
                                       <button
                                         type="button"
+                                        disabled={!postsCountValid}
+                                        title={
+                                          !postsCountValid
+                                            ? "Enter post count first"
+                                            : undefined
+                                        }
                                         className={cn(
                                           "flex h-10 w-full min-w-0 items-center justify-between gap-2 rounded-[10px] border-2 bg-transparent px-3 text-left text-sm font-light transition-all outline-none select-none",
                                           "border-gray-200 focus-visible:border-sidebar-custom-active focus-visible:ring-0",
@@ -598,7 +630,9 @@ const GamificationPage = () => {
                                             "border-sidebar-custom-active",
                                           draftPostsDuration
                                             ? "text-black"
-                                            : "text-gray-400"
+                                            : "text-gray-400",
+                                          !postsCountValid &&
+                                            "cursor-not-allowed opacity-50"
                                         )}
                                       >
                                         <span className="truncate">
@@ -894,11 +928,17 @@ const GamificationPage = () => {
                                         openCommissionTierStepForEdit()
                                       );
                                     }}
-                                    className="flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-custom-active transition-colors hover:bg-white/80"
+                                    className="group relative flex size-7 shrink-0 items-center justify-center rounded-md text-sidebar-custom-active transition-colors hover:bg-white/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-custom-active/40"
                                   >
+                                    <Check
+                                      className="size-4 shrink-0 transition-opacity duration-150 group-hover:opacity-0 group-focus-visible:opacity-0"
+                                      strokeWidth={2.5}
+                                      aria-hidden
+                                    />
                                     <Pencil
-                                      className="size-3.5"
+                                      className="absolute size-3.5 opacity-0 transition-opacity duration-150 group-hover:opacity-100 group-focus-visible:opacity-100"
                                       strokeWidth={2}
+                                      aria-hidden
                                     />
                                   </button>
                                 )}
